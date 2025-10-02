@@ -1,75 +1,113 @@
-package game.doodle_jump;
-
-import game.engine.*;
-import java.util.*;
-import android.graphics.*;
-
-public class Monster {
-	Texture texture;
-	double x,y,speed;
-	private boolean dir;
-	Player doodle;
-	static final int monster_length=80,monster_height=90;
-	Rect rect;
-	Rect trect;
-	Doodlejump doodlejump;
-	Bitmap bitmap;
-	public Monster(Doodlejump doodlejump,Player player) {
-		rect=new Rect();
-		trect=new Rect();
-		doodle=player;
-		this.doodlejump=doodlejump;
-		texture=new Texture(doodlejump);
-		x=(double)new Random().nextDouble()*(doodlejump.width-monster_length);
-		y=-10-monster_height;
-		speed=0;
-		while (speed<70)
-			speed=(double)new Random().nextInt(130);
-		dir=true;
-		trect.set(65,188,103,237);
-	}
-	boolean get_dir() {
-		rect.set((int)x,(int)(y-49),(int)(x+monster_length),(int)y);
-		return dir;
-	}
-	void go(double dt) {
-		if (x>0 && x<doodlejump.width-monster_length)
-		{
-			x+=speed*dt;
-			return;
-		}
-		speed=-speed;
-		dir=(speed>0)?true:false;
-		while (x>doodlejump.width-monster_length || x<0)
-			x+=speed*dt;
-		if (!dir) trect.set(106,188,144,237);
-		else trect.set(65,188,103,237);
-	}
-	void down(double dt) {
-		y+=dt*doodle.vy;
-	}
-	boolean dead() {
-		if (doodle.x+Player.length>=x && doodle.x+Player.length<=x+monster_length)
-		{
-			if (doodle.y-96>=y-monster_height && doodle.y-96<=y)
-				return true;
-			if (doodle.y>=y-monster_height && doodle.y<=y)
-				return true;
-		}
-		if (doodle.x>=x && doodle.x<=x+monster_length)
-		{
-			if (doodle.y-96>=y-monster_height && doodle.y-96<=y)
-				return true;
-			if (doodle.y>=y-monster_height && doodle.y<=y)
-				return true;
-		}
-		return false;
-	}
-	boolean destroy() {
-		return y-monster_height-10>doodlejump.height;
-	}
-	void draw(Canvas canvas,Paint paint,Texture texture) {
-		rect.set((int)x,(int)y-monster_height,(int)(x+monster_length),(int)y);
-		canvas.drawBitmap(texture.getBitmap(), trect, rect, paint);
-	}
+class Monster {
+    constructor(doodlejump, player) {
+        this.rect = { left: 0, top: 0, right: 0, bottom: 0 };
+        this.trect = { left: 65, top: 188, right: 103, bottom: 237 };
+        this.doodle = player;
+        this.doodlejump = doodlejump;
+        
+        this.x = Math.random() * (doodlejump.width - Monster.MONSTER_LENGTH);
+        this.y = -10 - Monster.MONSTER_HEIGHT;
+        this.speed = 0;
+        
+        while (this.speed < 70)
+            this.speed = Math.floor(Math.random() * 130);
+            
+        this.dir = true;
+    }
+    
+    static get MONSTER_LENGTH() { return 80; }
+    static get MONSTER_HEIGHT() { return 90; }
+    
+    get_dir() {
+        this.rect = {
+            left: Math.floor(this.x),
+            top: Math.floor(this.y - 49),
+            right: Math.floor(this.x + Monster.MONSTER_LENGTH),
+            bottom: Math.floor(this.y)
+        };
+        return this.dir;
+    }
+    
+    go(dt) {
+        if (this.x > 0 && this.x < this.doodlejump.width - Monster.MONSTER_LENGTH) {
+            this.x += this.speed * dt;
+            return;
+        }
+        
+        this.speed = -this.speed;
+        this.dir = (this.speed > 0);
+        
+        while (this.x > this.doodlejump.width - Monster.MONSTER_LENGTH || this.x < 0)
+            this.x += this.speed * dt;
+            
+        if (!this.dir) {
+            this.trect = { left: 106, top: 188, right: 144, bottom: 237 };
+        } else {
+            this.trect = { left: 65, top: 188, right: 103, bottom: 237 };
+        }
+    }
+    
+    down(dt) {
+        this.y += dt * this.doodle.vy;
+    }
+    
+    dead() {
+        // Проверка столкновения с игроком слева
+        if (this.doodle.x + Player.LENGTH >= this.x && 
+            this.doodle.x + Player.LENGTH <= this.x + Monster.MONSTER_LENGTH) {
+            if ((this.doodle.y - Player.LENGTH >= this.y - Monster.MONSTER_HEIGHT && 
+                 this.doodle.y - Player.LENGTH <= this.y) ||
+                (this.doodle.y >= this.y - Monster.MONSTER_HEIGHT && 
+                 this.doodle.y <= this.y)) {
+                return true;
+            }
+        }
+        
+        // Проверка столкновения с игроком справа
+        if (this.doodle.x >= this.x && 
+            this.doodle.x <= this.x + Monster.MONSTER_LENGTH) {
+            if ((this.doodle.y - Player.LENGTH >= this.y - Monster.MONSTER_HEIGHT && 
+                 this.doodle.y - Player.LENGTH <= this.y) ||
+                (this.doodle.y >= this.y - Monster.MONSTER_HEIGHT && 
+                 this.doodle.y <= this.y)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    destroy() {
+        return this.y - Monster.MONSTER_HEIGHT - 10 > this.doodlejump.height;
+    }
+    
+    draw(ctx) {
+        this.rect = {
+            left: this.x,
+            top: this.y - Monster.MONSTER_HEIGHT,
+            right: this.x + Monster.MONSTER_LENGTH,
+            bottom: this.y
+        };
+        
+        const texture = this.doodlejump.textures.photo;
+        if (texture) {
+            const sourceWidth = this.trect.right - this.trect.left;
+            const sourceHeight = this.trect.bottom - this.trect.top;
+            const destWidth = this.rect.right - this.rect.left;
+            const destHeight = this.rect.bottom - this.rect.top;
+            
+            ctx.drawImage(texture,
+                this.trect.left, this.trect.top, sourceWidth, sourceHeight,
+                this.rect.left, this.rect.top, destWidth, destHeight
+            );
+        } else {
+            // Fallback: рисуем простого монстра
+            ctx.fillStyle = 'purple';
+            ctx.fillRect(this.rect.left, this.rect.top, destWidth, destHeight);
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(this.rect.left + 10, this.rect.top + 10, 15, 15);
+            ctx.fillRect(this.rect.right - 25, this.rect.top + 10, 15, 15);
+        }
+    }
 }
