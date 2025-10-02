@@ -1,611 +1,624 @@
-package game.doodle_jump;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Random;
-
-import android.graphics.*;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.media.*;
-import android.util.*;
-import android.view.MotionEvent;
-import android.view.View;
-import game.engine.*;
-
-public class Doodlejump extends Engine {
-	TextPrinter tp;
-	Paint paint;
-	Canvas canvas;
-	Timer timer;
-	int height,width;
-	Monster monster;
-	Player doodle;
-	List<Board> boards;
-	List<Bullet> bullets;
-	public static final int g = 900,least=500;
-	double total_up,score,bullet_dt;
-	Texture left,right,photo,ball;
-	String msg;
-	double lorr;
-	MediaPlayer mediaPlayer;
-	SoundPool soundPool;
-	HashMap<String, Integer> hashMap;
-	MediaPlayer hatPlayer,rocketPlayer;
-	AudioManager audioManager;
-	int maxVolume;
-	boolean gameover,dead,gamestart,statistics,settings,pause,music_on,dir_shoot;
-	int highest_score,last_score,last_jump,max_jump;
-	int last_time,max_time,total_time,total_play,total_score;
-	int this_jump;
-	double this_time;
-	double average_score;
-	float mmx,mmy;
-	
-	public Doodlejump() {
-		Log.d("Game","Game constructor");
-		paint=new Paint();
-		canvas=null;
-		tp=new TextPrinter();
-		tp.setColor(Color.WHITE);
-		tp.setTextSize(24);
-		tp.setLineSpacing(28);
-		timer=new Timer();
-		setFrameRate(50);
-		doodle=new Player(this);
-		monster=null;
-		//boards=null;bullets=null;
-		boards=new ArrayList<Board>();
-		bullets=new ArrayList<Bullet>();
-		left=new Texture(this);right=new Texture(this);photo=new Texture(this);
-		ball=new Texture(this);
-		msg=new String("click");
-		soundPool=new SoundPool(10, AudioManager.STREAM_MUSIC, 0);
-		hashMap=new HashMap<String, Integer>();
-	}
-	
-	public void init() {
-		Log.d("Game","Game.init");
-		super.setScreenOrientation(ScreenModes.PORTRAIT);
-		dir_shoot=true;
-		music_on=true;
-		set_statistics(0);
-		another_init();
-	}
-	
-	public void another_init() {
-		monster=null;
-		boards=new ArrayList<Board>();
-		boards.add(new Board(190, 600, this, doodle));
-		another_board(0);
-		another_board(0);
-		another_board(0);
-		another_board(0);
-		doodle.init_player();
-		bullet_dt=0;
-		score=0;
-		gameover=false;
-		gamestart=false;
-		dead=false;
-		statistics=false;
-		settings=false;
-		pause=false;
-		this_jump=0;
-		this_time=0;
-		setFrameRate(FRAME_NO_DELAY);
-	}
-	
-	public void load() {
-		Log.d("Game","Game.load");
-		left.loadFromAsset("left.png");
-		right.loadFromAsset("right.png");
-		photo.loadFromAsset("photo.png");
-		ball.loadFromAsset("ball.png");
-		doodle.set_texture(left, right);
-		hashMap.put("beat.ogg", soundPool.load(this, R.raw.beat, 0));
-		hashMap.put("click.ogg", soundPool.load(this, R.raw.click, 0));
-		hashMap.put("dead.ogg", soundPool.load(this, R.raw.dead, 0));
-		hashMap.put("monster.ogg", soundPool.load(this, R.raw.monster, 0));
-		hashMap.put("shoot.ogg", soundPool.load(this, R.raw.shoot, 0));
-		hashMap.put("spring.ogg", soundPool.load(this, R.raw.spring, 0));
-		mediaPlayer=MediaPlayer.create(this, R.raw.music);
-		hatPlayer=MediaPlayer.create(this, R.raw.hat);
-		rocketPlayer=MediaPlayer.create(this, R.raw.rocket);
-		hatPlayer.setLooping(true);
-		rocketPlayer.setLooping(true);
-		mediaPlayer.setLooping(true);
-		audioManager=(AudioManager)getSystemService(AUDIO_SERVICE);
-		maxVolume=audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-		mediaPlayer.setVolume(maxVolume/10, maxVolume/10);
-		if (music_on) mediaPlayer.start();
-	}
-	
-	public void draw() {
-		Log.d("Game","Game.draw");
-		//paint.setColor(Color.WHITE);
-		canvas=super.getCavas();		
-		height=canvas.getHeight();
-		width=canvas.getWidth();
-		canvas.drawColor(Color.rgb(255, 182, 193));
-		paint.setColor(Color.rgb(255, 105, 180));
-		//paint.setColor(Color.BLUE);
-		for (int i=0;i<=height;i+=20)
-			canvas.drawLine(0, i, width, i, paint);
-		for (int i=0;i<=width;i+=20)
-			canvas.drawLine(i, 0, i, height, paint);
-		/*
-		tp.setCanvas(canvas);
-		tp.draw("height: "+height, 100, 100);
-		tp.draw("Width: "+width);
-		*/
-		doodle.draw(canvas, paint,photo);
-		if (monster!=null) {
-			monster.draw(canvas, paint, photo);
-		}
-		
-		ListIterator<Board> it=boards.listIterator();
-		while (it.hasNext()) {
-			Board temp=it.next();
-			switch (temp.get_id()) {
-				case 0:
-					canvas.drawBitmap(photo.getBitmap(), 
-							new Rect(0, 0, 60, 16), new Rect((int)temp.get_x(), 
-									(int)temp.get_y(), (int)temp.get_x()+Board.board_length,
-										(int)temp.get_y()+28), paint);
-					break;
-				case 1:
-					canvas.drawBitmap(photo.getBitmap(), 
-							new Rect(0, 17, 60, 35), new Rect((int)temp.get_x(), 
-									(int)temp.get_y(), (int)temp.get_x()+Board.board_length,
-										(int)temp.get_y()+28), paint);
-					break;
-				case 2:
-					canvas.drawBitmap(photo.getBitmap(), 
-							new Rect(0, 35, 60, 53), new Rect((int)temp.get_x(), 
-									(int)temp.get_y(), (int)temp.get_x()+Board.board_length,
-										(int)temp.get_y()+28), paint);
-					break;
-				case 3:
-					canvas.drawBitmap(photo.getBitmap(), 
-							new Rect(0, 53, 60, 71), new Rect((int)temp.get_x(), 
-									(int)temp.get_y(), (int)temp.get_x()+Board.board_length,
-										(int)temp.get_y()+28), paint);
-					break;
-				default:
-					canvas.drawBitmap(photo.getBitmap(), 
-							new Rect(0, 182+18*(temp.get_id()-4), 60, 
-									182+18*(temp.get_id()-3)),new Rect((int)temp.get_x(), 
-									(int)temp.get_y(), (int)temp.get_x()+Board.board_length,
-									(int)temp.get_y()+28), paint);
-					break;
-			}
-			temp.draw_item(canvas, paint, photo);
-		}
-		for (int i=0;i<bullets.size();i++) {
-			bullets.get(i).draw(canvas, paint);
-		}
-		
-		tp.setCanvas(canvas);
-		tp.setColor(Color.RED);
-		tp.setTextSize(22);
-		tp.setLineSpacing(25);
-		tp.setAlign(TextPrinter.ALIGN_LEFT);
-		tp.draw(""+(int)score, 15, 30);
-		//tp.draw("("+mmx+","+mmy+")");
-		
-		if (!pause && gamestart) {
-			tp.setColor(Color.BLACK);
-			tp.setTextSize(52);
-			tp.setColor(Color.BLACK);
-			tp.setAlign(TextPrinter.ALIGN_RIGHT);
-			tp.draw("Pause", width-30, 63);
-		}
-		
-		if (settings) {
-			tp.setColor(Color.BLACK);
-			tp.setTextSize(48);
-			tp.setLineSpacing(56);
-			tp.setAlign(TextPrinter.ALIGN_MIDDLE);
-			tp.draw("MUSIC:", width/2, 200);
-			tp.draw("ON      OFF");
-			tp.draw("");tp.draw("");
-			tp.draw("AUTO SHOOTING");
-			tp.draw("ON      OFF");
-			tp.draw("");tp.draw("");tp.draw("");
-			tp.draw("BACK");
-			if (dir_shoot) tp.draw("*", width/2-110, 480);
-			else tp.draw("*", width/2+10, 480);
-			if (music_on) tp.draw("*",width/2-110,256);
-			else tp.draw("*", width/2+10, 256);
-			return;
-		}
-		
-		if (pause) {
-			tp.setColor(Color.BLACK);
-			tp.setAlign(TextPrinter.ALIGN_MIDDLE);
-			tp.setTextSize(56);
-			tp.setLineSpacing(150);
-			tp.draw("Pausing......", width/2, 200);
-			tp.draw("SETTINGS");
-			tp.draw("BACK");
-		}
-		
-		if (!gamestart)
-		{
-			if (statistics) {
-				tp.setColor(Color.BLACK);
-				tp.setTextSize(36);
-				tp.setLineSpacing(40);
-				tp.setAlign(TextPrinter.ALIGN_LEFT);
-				set_statistics(0);
-				tp.draw("Highest score: "+highest_score,100,200);
-				tp.draw("Average score: "+average_score);
-				tp.draw("Last score: "+last_score);
-				tp.draw("Last jump: "+last_jump);
-				tp.draw("Max jump: "+max_jump);
-				tp.draw("Last time: "+last_time+" s");
-				tp.draw("Max time: "+max_time+" s");
-				tp.draw("Total time: "+total_time+" s");
-				tp.draw("Total play: "+total_play);
-				tp.setTextSize(48);
-				tp.setAlign(TextPrinter.ALIGN_MIDDLE);
-				tp.draw("RESET        BACK",width/2, 600);
-				return;
-			}
-			tp.setColor(Color.BLACK);
-			tp.setTextSize(56);
-			tp.setLineSpacing(150);
-			tp.setAlign(TextPrinter.ALIGN_MIDDLE);
-			tp.draw("START", width/2, 200);
-			tp.draw("SETTINGS");
-			tp.draw("STATISTICS");
-			tp.draw("EXIT");
-		}
-		if (gameover)
-		{
-			tp.setColor(Color.BLACK);
-			tp.setTextSize(52);
-			tp.setLineSpacing(100);
-			tp.setAlign(TextPrinter.ALIGN_MIDDLE);
-			tp.draw("GAME OVER", width/2, 300);
-			tp.draw(""+(int)score);
-		}
-	}
-	
-	public void update() {
-		double dt=(double)timer.getTimeDelta()/1000;
-		Log.d("Game", "Game.update");
-		if (!gamestart) return;
-		if (gameover) return;
-		if (pause) return;
-		bullet_dt+=dt;
-		this_time+=dt;
-		if (height!=0) {
-			while (boards.get(0).get_y()>height) {
-				boards.remove(0);			
-				another_board(-1);
-			}
-		}
-		
-		if (width!=0 && monster==null) {
-			if (new Random().nextInt(1000)==1) {
-				monster=new Monster(this,doodle);
-			}
-		}
-		
-		if (monster!=null)
-			monster.go(dt);
-		
-		for (int i=0;i<bullets.size();i++) {
-			if (monster!=null && bullets.get(i).shoot()) {
-				monster=null;
-				bullets.remove(i);
-				i--;
-				play("beat.ogg");
-			}
-		}
-		
-		for (int i=0;i<bullets.size();i++) {
-			bullets.get(i).go(dt);
-			if (bullets.get(i).destroy()) {
-				bullets.remove(i);
-				i--;
-			}
-		}
-		
-		int i=0;
-		while (i<boards.size()) {
-			Board temp=boards.get(i);
-			temp.go_ahead(dt);
-			if (temp.disappear(dt)) {
-				boards.remove(temp);
-				i--;
-				another_board(-1);
-			}
-			i++;
-		}
-		/*
-		if (lorr<0) doodle.go_vx(false, -dt*lorr);
-		else if (lorr>0) doodle.go_vx(true, dt*lorr);
-		lorr=0;
-		*/
-		if (width!=0)
-			doodle.go_x(dt,width);
-		if (msg.equals("click")) {
-			doodle.reset();
-			msg=new String("up");
-		}
-		else if (msg.equals("up")) {
-			if (doodle.move) {
-				if (doodle.y>=2*height/5) {
-					doodle.go_y(dt, false);
-				}
-				else {
-					i=0;
-					while (i<boards.size()) {
-						Board temp=boards.get(i);
-						temp.move_y(dt);
-						temp.down();
-						i++;
-					}
-					for (int j=0;j<bullets.size();j++) {
-						bullets.get(j).down(dt);
-					}
-					total_up-=dt*doodle.y;
-					
-					if (monster!=null) {
-						monster.down(dt);
-						if (monster.destroy()) monster=null;
-					}
-				}
-				score+=(height-doodle.y)*dt/10;
-				if (!doodle.is_flying() && total_up<0) {
-					doodle.set_move(false);
-					total_up=0;
-				}
-			}
-			else
-				doodle.go_y(dt, false);
-			doodle.go_vy(dt, false);
-			if (!doodle.is_flying() && monster!=null && monster.dead()) {
-				doodle.monster();
-				dead=true;
-			}
-			if (doodle.vy<=0) {
-				doodle.set_state(0);
-				total_up=0;
-				msg=new String("down");
-				if (hatPlayer.isPlaying()) hatPlayer.pause();
-				if (rocketPlayer.isPlaying()) rocketPlayer.pause();
-			}
-		}
-		else if (msg.equals("down")) {
-			doodle.go_y(dt, true);
-			doodle.go_vy(dt, true);
-			if (!dead && monster!=null && monster.dead()) {
-				doodle.click();
-				msg=new String("click");
-				play("monster.ogg");
-				monster=null;
-				this_jump++;
-			}
-			for (i=0;i<boards.size();i++) {
-				Board temp=boards.get(i);
-				if (!dead && temp.is_click()) {
-					doodle.click();
-					this_jump++;
-					if (i==boards.size()-1) {
-						another_board(-1);
-					}
-					//play("click.ogg");
-					doodle.set_state(temp.get_state());
-					switch (doodle.state) {
-						case 0: play("click.ogg");break;
-						case 1: case 4: play("spring.ogg");break;
-						case 2: hatPlayer.start();
-							hatPlayer.setVolume(maxVolume/15, maxVolume/15);break;
-						case 3: rocketPlayer.start();
-							rocketPlayer.setVolume(maxVolume/15, maxVolume/15);break;
-					}
-					msg=new String("click");
-					if (temp.destroy()) {
-						boards.remove(temp);
-						i--;
-						another_board(-1);
-					}
-				}
-			}
-			if (height!=0 && doodle.y>height+97)
-			{
-				play("dead.ogg");
-				gameover=true;
-				int tmp=(int)score;
-				total_score+=tmp;
-				total_play++;
-				total_time+=this_time;
-				last_score=tmp;
-				last_time=(int)this_time;
-				last_jump=this_jump;
-				if (tmp>highest_score) highest_score=tmp;
-				if (this_time>max_time) max_time=(int)this_time;
-				if (this_jump>max_jump) max_jump=this_jump;
-				this_jump=0;
-				this_time=0;
-				//score=0;
-				set_statistics(1);
-			}
-		}
-	}
-	
-	void another_board(int l) {
-		Random random=new Random();
-		if (l==-1) l=random.nextInt(5);
-		double t=0,p=0;
-		int id=0;
-		int xx=0;
-		while (xx<130) xx=random.nextInt(210);
-		switch (l) {
-			case 0:
-				t=random.nextDouble();
-				if (t<=0.2) {
-					p=random.nextDouble()*(Board.board_length-Item.spring_length);
-					id=1;
-				}
-				else if (t<=0.25) {
-					p=random.nextDouble()*(Board.board_length-Item.hat_length);
-					id=2;
-				}
-				else if (t<=0.28) {
-					p=random.nextDouble()*(Board.board_length-Item.rocket_length);
-					id=3;
-				}
-				else if (t<=0.33) {
-					p=random.nextDouble()*(Board.board_length-Item.shoes_length);
-					id=4;
-				}
-				boards.add(new Greenboard(random.nextDouble()*(400-Board.board_length), 
-						boards.get(boards.size()-1).get_y()-xx, id, p, this,doodle));
-				break;
-			case 1:
-				boards.add(new Blueboard(random.nextDouble()*(400-Board.board_length), 
-						boards.get(boards.size()-1).get_y()-xx, this,doodle));
-				break;
-			case 2:
-				boards.add(new Brownboard(random.nextDouble()*(400-Board.board_length), 
-						boards.get(boards.size()-1).get_y()-xx, this,doodle));
-				break;
-			case 3:
-				boards.add(new Whiteboard(random.nextDouble()*(400-Board.board_length), 
-						boards.get(boards.size()-1).get_y()-xx, this,doodle));
-				break;
-			case 4:
-				boards.add(new Yellowboard(random.nextDouble()*(400-Board.board_length), 
-						boards.get(boards.size()-1).get_y()-xx, this,doodle));
-				break;
-		}
-	}
-	
-	void set_statistics(int mode) {
-		//if (mode<=2) return;
-		if (mode==0) {
-			highest_score=getData("highest_score", 0);
-			total_play=getData("total_play", 0);
-			total_score=getData("total_score", 0);
-			total_time=getData("total_time", 0);
-			last_score=getData("last_score", 0);
-			last_jump=getData("last_jump", 0);
-			last_time=getData("last_time", 0);
-			max_jump=getData("max_jump", 0);
-			max_time=getData("max_time", 0);
-			if (total_play==0) average_score=0;
-			else average_score=(double)total_score/(double)total_play;
-			average_score=round(average_score, 3);
-		}
-		else if (mode==1) { // set Input
-			saveData("highest_score", highest_score);
-			saveData("total_play", total_play);
-			saveData("total_score", total_score);
-			saveData("total_time", total_time);
-			saveData("last_score", last_score);
-			saveData("last_jump", last_jump);
-			saveData("last_time", last_time);
-			saveData("max_jump", max_jump);
-			saveData("max_time", max_time);
-			saveCommitted();
-		}
-		else if (mode==2) {
-			highest_score=0;total_play=0;total_score=0;total_time=0;
-			last_score=0;last_jump=0;last_time=0;max_jump=0;max_time=0;
-			set_statistics(1);
-		}
-	}
-	
-	public void onSensorChanged(SensorEvent sensorEvent) {
-		if (!gamestart || gameover) return;
-		switch (sensorEvent.sensor.getType()) {
-			case Sensor.TYPE_ACCELEROMETER: 
-				double x0=(double) sensorEvent.values[0];
-				doodle.vx=-x0*80;
-				doodle.dir=x0>0?false:true;
-		}
-	}
-	
-	public void play(String string) {
-		try {
-			if (music_on)
-				soundPool.play(hashMap.get(string), 1f, 1f, 1, 0, 1f);
-		} catch (Exception e) {}
-	}
-	
-	public void onPause() {
-		super.onPause();
-		if (!gameover && gamestart) pause=true;
-		if (mediaPlayer.isPlaying()) mediaPlayer.pause();
-		if (hatPlayer.isPlaying()) hatPlayer.pause();
-		if (rocketPlayer.isPlaying()) rocketPlayer.pause();
-	}
-	
-	public void onResume() {
-		super.onResume();
-		if (music_on) mediaPlayer.start();
-	}
-	
-	public boolean onTouch(View view,MotionEvent motionEvent) {
-		float x=motionEvent.getX(),y=motionEvent.getY();
-		mmx=x;mmy=y;
-		if (settings) {
-			if (mmx>width/2-50 && mmx<width/2+60 && mmy>650 && mmy<716) settings=false;
-			if (mmx>width/2+40 && mmx<width/2+100 && mmy>450 && mmy<500) dir_shoot=false;
-			if (mmx>width/2-100 && mmx<width/2-45 && mmy>450 && mmy<500) dir_shoot=true;
-			if (mmx>width/2-100 && mmx<width/2-45 && mmy>200 && mmy<265)
-			{
-				mediaPlayer.start();
-				music_on=true;
-			}
-			if (mmx>width/2+40 && mmx<width/2+100 && mmy>200 && mmy<265)
-			{
-				mediaPlayer.pause();
-				music_on=false;
-			}
-		}
-		else if (statistics) {
-			if (mmx>width/2-140 && mmx<width/2-45 && mmy>550 && mmy<605) set_statistics(2);
-			if (mmx>width/2+75 && mmx<width/2+140 && mmy>550 && mmy<605) statistics=false;
-		}
-		else if (!gamestart) {
-			if (x>width/2-90 && x<width/2+90 && y>140 && y<210) gamestart=true;
-			if (x>width/2-120 && x<width/2+120 && y>290 && y<360) settings=true;
-			if (x>width/2-150 && x<width/2+150 && y>450 && y<510) statistics=true;
-			if (x>width/2-80 && x<width/2+70 && y>590 && y<648) System.exit(0);
-		}
-		else if (gameover) {
-			another_init();
-		}
-		else if (pause) {
-			if (mmx>width/2-100 && mmx<width/2+140 && mmy>280 && mmy<350)
-				settings=true;
-			else if (mmx>width/2-70 && mmx<width/2+70 && mmy<510 && mmy>440)
-				pause=false;
-			/*if (mmy>100)
-			{
-				pause=false;
-				if (doodle.state==2 && music_on) hatPlayer.start();
-				if (doodle.state==3 && music_on) rocketPlayer.start();;
-			}*/
-		}
-		else if (mmx>width-140 && mmx<width && mmy>13 && mmy<70) {
-			pause=true;
-			if (hatPlayer.isPlaying()) hatPlayer.pause();
-			if (rocketPlayer.isPlaying()) rocketPlayer.pause();
-		}
-		else if (bullet_dt>0.2) {
-			bullets.add(new Bullet(doodle.x+48, doodle.y-48, doodle, this));
-			bullet_dt=0;
-			play("shoot.ogg");
-		}
-		return true;
-	}
-
+// Doodlejump.js - главный класс игры
+class Doodlejump {
+    constructor() {
+        console.log("Game constructor");
+        this.canvas = null;
+        this.ctx = null;
+        this.height = 0;
+        this.width = 0;
+        
+        // Игровые константы
+        this.G = 900;
+        this.LEAST = 500;
+        
+        // Игровые объекты
+        this.doodle = new Player(this);
+        this.monster = null;
+        this.boards = [];
+        this.bullets = [];
+        
+        // Состояние игры
+        this.gameover = false;
+        this.dead = false;
+        this.gamestart = false;
+        this.statistics = false;
+        this.settings = false;
+        this.pause = false;
+        this.music_on = true;
+        this.dir_shoot = true;
+        
+        // Статистика
+        this.score = 0;
+        this.total_up = 0;
+        this.bullet_dt = 0;
+        this.this_jump = 0;
+        this.this_time = 0;
+        
+        this.highest_score = 0;
+        this.last_score = 0;
+        this.last_jump = 0;
+        this.max_jump = 0;
+        this.last_time = 0;
+        this.max_time = 0;
+        this.total_time = 0;
+        this.total_play = 0;
+        this.total_score = 0;
+        this.average_score = 0;
+        
+        this.msg = "click";
+        this.lastTime = 0;
+        
+        // Загрузка текстур
+        this.textures = {};
+    }
+    
+    init(canvas) {
+        console.log("Game init");
+        this.canvas = canvas;
+        this.ctx = canvas.getContext('2d');
+        this.height = canvas.height;
+        this.width = canvas.width;
+        
+        this.set_statistics(0);
+        this.another_init();
+        
+        // Запуск игрового цикла
+        this.gameLoop();
+    }
+    
+    another_init() {
+        this.monster = null;
+        this.boards = [];
+        this.bullets = [];
+        
+        // Создаем начальные платформы
+        this.boards.push(new Board(190, 600, this, this.doodle));
+        this.another_board(0);
+        this.another_board(0);
+        this.another_board(0);
+        this.another_board(0);
+        
+        this.doodle.init_player();
+        this.bullet_dt = 0;
+        this.score = 0;
+        this.gameover = false;
+        this.gamestart = false;
+        this.dead = false;
+        this.statistics = false;
+        this.settings = false;
+        this.pause = false;
+        this.this_jump = 0;
+        this.this_time = 0;
+        this.msg = "click";
+    }
+    
+    async loadTextures() {
+        // Загрузка изображений для игры
+        try {
+            this.textures.left = await this.loadImage('left.png');
+            this.textures.right = await this.loadImage('right.png');
+            this.textures.photo = await this.loadImage('photo.png');
+            this.textures.ball = await this.loadImage('ball.png');
+            
+            this.doodle.updateTextures(this.textures.left, this.textures.right);
+        } catch (error) {
+            console.error("Error loading textures:", error);
+        }
+    }
+    
+    loadImage(src) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+        });
+    }
+    
+    gameLoop(timestamp) {
+        if (!this.lastTime) this.lastTime = timestamp;
+        const dt = (timestamp - this.lastTime) / 1000;
+        this.lastTime = timestamp;
+        
+        this.update(dt);
+        this.draw();
+        
+        requestAnimationFrame((ts) => this.gameLoop(ts));
+    }
+    
+    update(dt) {
+        if (!this.gamestart) return;
+        if (this.gameover) return;
+        if (this.pause) return;
+        
+        this.bullet_dt += dt;
+        this.this_time += dt;
+        
+        // Удаляем платформы за пределами экрана
+        if (this.height !== 0) {
+            while (this.boards.length > 0 && this.boards[0].get_y() > this.height) {
+                this.boards.shift();
+                this.another_board(-1);
+            }
+        }
+        
+        // Создаем монстра
+        if (this.width !== 0 && this.monster === null) {
+            if (Math.floor(Math.random() * 1000) === 1) {
+                this.monster = new Monster(this, this.doodle);
+            }
+        }
+        
+        // Обновляем монстра
+        if (this.monster !== null) {
+            this.monster.go(dt);
+        }
+        
+        // Обновляем пули
+        for (let i = 0; i < this.bullets.length; i++) {
+            if (this.monster !== null && this.bullets[i].shoot(this.monster)) {
+                this.monster = null;
+                this.bullets.splice(i, 1);
+                i--;
+                this.play("beat.ogg");
+            }
+        }
+        
+        // Движение пуль
+        for (let i = 0; i < this.bullets.length; i++) {
+            this.bullets[i].go(dt);
+            if (this.bullets[i].destroy()) {
+                this.bullets.splice(i, 1);
+                i--;
+            }
+        }
+        
+        // Обновляем платформы
+        for (let i = 0; i < this.boards.length; i++) {
+            const temp = this.boards[i];
+            temp.go_ahead(dt);
+            if (temp.disappear(dt)) {
+                this.boards.splice(i, 1);
+                i--;
+                this.another_board(-1);
+            }
+        }
+        
+        // Движение игрока по X
+        if (this.width !== 0) {
+            this.doodle.go_x(dt, this.width);
+        }
+        
+        // Логика прыжков и движения
+        if (this.msg === "click") {
+            this.doodle.reset();
+            this.msg = "up";
+        } else if (this.msg === "up") {
+            this.handleUpState(dt);
+        } else if (this.msg === "down") {
+            this.handleDownState(dt);
+        }
+    }
+    
+    handleUpState(dt) {
+        if (this.doodle.move) {
+            if (this.doodle.y >= 2 * this.height / 5) {
+                this.doodle.go_y(dt, false);
+            } else {
+                // Движение платформ и объектов вниз
+                for (let i = 0; i < this.boards.length; i++) {
+                    const temp = this.boards[i];
+                    temp.move_y(dt);
+                    temp.down();
+                }
+                
+                for (let j = 0; j < this.bullets.length; j++) {
+                    this.bullets[j].down(dt);
+                }
+                
+                this.total_up -= dt * this.doodle.vy;
+                
+                if (this.monster !== null) {
+                    this.monster.down(dt);
+                    if (this.monster.destroy()) this.monster = null;
+                }
+            }
+            
+            this.score += (this.height - this.doodle.y) * dt / 10;
+            
+            if (!this.doodle.is_flying() && this.total_up < 0) {
+                this.doodle.set_move(false);
+                this.total_up = 0;
+            }
+        } else {
+            this.doodle.go_y(dt, false);
+        }
+        
+        this.doodle.go_vy(dt, false);
+        
+        if (!this.doodle.is_flying() && this.monster !== null && this.monster.dead()) {
+            this.doodle.monster();
+            this.dead = true;
+        }
+        
+        if (this.doodle.vy <= 0) {
+            this.doodle.set_state(0);
+            this.total_up = 0;
+            this.msg = "down";
+        }
+    }
+    
+    handleDownState(dt) {
+        this.doodle.go_y(dt, true);
+        this.doodle.go_vy(dt, true);
+        
+        if (!this.dead && this.monster !== null && this.monster.dead()) {
+            this.doodle.click();
+            this.msg = "click";
+            this.play("monster.ogg");
+            this.monster = null;
+            this.this_jump++;
+        }
+        
+        for (let i = 0; i < this.boards.length; i++) {
+            const temp = this.boards[i];
+            if (!this.dead && temp.is_click()) {
+                this.doodle.click();
+                this.this_jump++;
+                
+                if (i === this.boards.length - 1) {
+                    this.another_board(-1);
+                }
+                
+                this.doodle.set_state(temp.get_state());
+                this.msg = "click";
+                
+                if (temp.destroy()) {
+                    this.boards.splice(i, 1);
+                    i--;
+                    this.another_board(-1);
+                }
+            }
+        }
+        
+        if (this.height !== 0 && this.doodle.y > this.height + 97) {
+            this.play("dead.ogg");
+            this.gameover = true;
+            const tmp = Math.floor(this.score);
+            this.total_score += tmp;
+            this.total_play++;
+            this.total_time += this.this_time;
+            this.last_score = tmp;
+            this.last_time = Math.floor(this.this_time);
+            this.last_jump = this.this_jump;
+            
+            if (tmp > this.highest_score) this.highest_score = tmp;
+            if (this.this_time > this.max_time) this.max_time = Math.floor(this.this_time);
+            if (this.this_jump > this.max_jump) this.max_jump = this.this_jump;
+            
+            this.this_jump = 0;
+            this.this_time = 0;
+            this.set_statistics(1);
+        }
+    }
+    
+    draw() {
+        if (!this.ctx) return;
+        
+        // Очистка canvas
+        this.ctx.fillStyle = 'rgb(255, 182, 193)';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Сетка фона
+        this.ctx.strokeStyle = 'rgb(255, 105, 180)';
+        this.ctx.lineWidth = 1;
+        
+        for (let i = 0; i <= this.height; i += 20) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, i);
+            this.ctx.lineTo(this.width, i);
+            this.ctx.stroke();
+        }
+        
+        for (let i = 0; i <= this.width; i += 20) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(i, 0);
+            this.ctx.lineTo(i, this.height);
+            this.ctx.stroke();
+        }
+        
+        // Отрисовка игрока
+        this.doodle.draw(this.ctx);
+        
+        // Отрисовка монстра
+        if (this.monster !== null) {
+            this.monster.draw(this.ctx);
+        }
+        
+        // Отрисовка платформ
+        for (const board of this.boards) {
+            this.drawBoard(board);
+            board.draw_item(this.ctx, this.textures.photo);
+        }
+        
+        // Отрисовка пуль
+        for (const bullet of this.bullets) {
+            bullet.draw(this.ctx);
+        }
+        
+        // Отрисовка счета
+        this.ctx.fillStyle = 'red';
+        this.ctx.font = '22px Arial';
+        this.ctx.fillText(Math.floor(this.score).toString(), 15, 30);
+        
+        // Отрисовка UI в зависимости от состояния игры
+        this.drawUI();
+    }
+    
+    drawBoard(board) {
+        // Упрощенная отрисовка платформ (цветами вместо текстур)
+        this.ctx.fillStyle = this.getBoardColor(board.get_id());
+        this.ctx.fillRect(board.get_x(), board.get_y(), Board.BOARD_LENGTH, 28);
+    }
+    
+    getBoardColor(boardId) {
+        const colors = {
+            0: 'green',    // Зеленая платформа
+            1: 'blue',     // Синяя платформа  
+            2: 'brown',    // Коричневая платформа
+            3: 'white',    // Белая платформа
+            4: 'yellow',   // Желтая платформа (исчезающая)
+            5: 'orange',
+            6: 'red',
+            7: 'purple',
+            8: 'cyan',
+            9: 'magenta'
+        };
+        return colors[boardId] || 'gray';
+    }
+    
+    drawUI() {
+        this.ctx.fillStyle = 'black';
+        this.ctx.font = '48px Arial';
+        this.ctx.textAlign = 'center';
+        
+        if (this.settings) {
+            this.drawSettingsUI();
+        } else if (this.statistics) {
+            this.drawStatisticsUI();
+        } else if (!this.gamestart) {
+            this.drawMainMenu();
+        } else if (this.gameover) {
+            this.drawGameOver();
+        } else if (this.pause) {
+            this.drawPauseMenu();
+        }
+    }
+    
+    drawSettingsUI() {
+        this.ctx.fillText("MUSIC:", this.width / 2, 200);
+        this.ctx.fillText("ON      OFF", this.width / 2, 256);
+        this.ctx.fillText("AUTO SHOOTING", this.width / 2, 368);
+        this.ctx.fillText("ON      OFF", this.width / 2, 424);
+        this.ctx.fillText("BACK", this.width / 2, 536);
+        
+        if (this.dir_shoot) {
+            this.ctx.fillText("*", this.width / 2 - 110, 424);
+        } else {
+            this.ctx.fillText("*", this.width / 2 + 10, 424);
+        }
+        
+        if (this.music_on) {
+            this.ctx.fillText("*", this.width / 2 - 110, 256);
+        } else {
+            this.ctx.fillText("*", this.width / 2 + 10, 256);
+        }
+    }
+    
+    drawStatisticsUI() {
+        this.set_statistics(0);
+        this.ctx.font = '36px Arial';
+        this.ctx.textAlign = 'left';
+        
+        let y = 200;
+        this.ctx.fillText(`Highest score: ${this.highest_score}`, 100, y); y += 40;
+        this.ctx.fillText(`Average score: ${this.average_score}`, 100, y); y += 40;
+        this.ctx.fillText(`Last score: ${this.last_score}`, 100, y); y += 40;
+        this.ctx.fillText(`Last jump: ${this.last_jump}`, 100, y); y += 40;
+        this.ctx.fillText(`Max jump: ${this.max_jump}`, 100, y); y += 40;
+        this.ctx.fillText(`Last time: ${this.last_time} s`, 100, y); y += 40;
+        this.ctx.fillText(`Max time: ${this.max_time} s`, 100, y); y += 40;
+        this.ctx.fillText(`Total time: ${this.total_time} s`, 100, y); y += 40;
+        this.ctx.fillText(`Total play: ${this.total_play}`, 100, y); y += 40;
+        
+        this.ctx.font = '48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText("RESET        BACK", this.width / 2, 600);
+    }
+    
+    drawMainMenu() {
+        this.ctx.fillText("START", this.width / 2, 200);
+        this.ctx.fillText("SETTINGS", this.width / 2, 350);
+        this.ctx.fillText("STATISTICS", this.width / 2, 500);
+        this.ctx.fillText("EXIT", this.width / 2, 650);
+    }
+    
+    drawGameOver() {
+        this.ctx.fillText("GAME OVER", this.width / 2, 300);
+        this.ctx.fillText(Math.floor(this.score).toString(), this.width / 2, 400);
+    }
+    
+    drawPauseMenu() {
+        this.ctx.fillText("Pausing......", this.width / 2, 200);
+        this.ctx.fillText("SETTINGS", this.width / 2, 350);
+        this.ctx.fillText("BACK", this.width / 2, 500);
+    }
+    
+    another_board(l) {
+        if (l === -1) l = Math.floor(Math.random() * 5);
+        let t = 0, p = 0, id = 0;
+        let xx = 0;
+        
+        while (xx < 130) xx = Math.floor(Math.random() * 210);
+        
+        const lastBoard = this.boards[this.boards.length - 1];
+        const newY = lastBoard.get_y() - xx;
+        const newX = Math.random() * (400 - Board.BOARD_LENGTH);
+        
+        switch (l) {
+            case 0:
+                t = Math.random();
+                if (t <= 0.2) {
+                    p = Math.random() * (Board.BOARD_LENGTH - Item.SPRING_LENGTH);
+                    id = 1;
+                } else if (t <= 0.25) {
+                    p = Math.random() * (Board.BOARD_LENGTH - Item.HAT_LENGTH);
+                    id = 2;
+                } else if (t <= 0.28) {
+                    p = Math.random() * (Board.BOARD_LENGTH - Item.ROCKET_LENGTH);
+                    id = 3;
+                } else if (t <= 0.33) {
+                    p = Math.random() * (Board.BOARD_LENGTH - Item.SHOES_LENGTH);
+                    id = 4;
+                }
+                this.boards.push(new Greenboard(newX, newY, id, p, this, this.doodle));
+                break;
+            case 1:
+                this.boards.push(new Blueboard(newX, newY, this, this.doodle));
+                break;
+            case 2:
+                this.boards.push(new Brownboard(newX, newY, this, this.doodle));
+                break;
+            case 3:
+                this.boards.push(new Whiteboard(newX, newY, this, this.doodle));
+                break;
+            case 4:
+                this.boards.push(new Yellowboard(newX, newY, this, this.doodle));
+                break;
+        }
+    }
+    
+    set_statistics(mode) {
+        if (mode === 0) {
+            // Загрузка статистики из localStorage
+            this.highest_score = parseInt(localStorage.getItem('highest_score') || '0');
+            this.total_play = parseInt(localStorage.getItem('total_play') || '0');
+            this.total_score = parseInt(localStorage.getItem('total_score') || '0');
+            this.total_time = parseInt(localStorage.getItem('total_time') || '0');
+            this.last_score = parseInt(localStorage.getItem('last_score') || '0');
+            this.last_jump = parseInt(localStorage.getItem('last_jump') || '0');
+            this.last_time = parseInt(localStorage.getItem('last_time') || '0');
+            this.max_jump = parseInt(localStorage.getItem('max_jump') || '0');
+            this.max_time = parseInt(localStorage.getItem('max_time') || '0');
+            
+            this.average_score = this.total_play === 0 ? 0 : this.total_score / this.total_play;
+            this.average_score = Math.round(this.average_score * 1000) / 1000;
+        } else if (mode === 1) {
+            // Сохранение статистики в localStorage
+            localStorage.setItem('highest_score', this.highest_score.toString());
+            localStorage.setItem('total_play', this.total_play.toString());
+            localStorage.setItem('total_score', this.total_score.toString());
+            localStorage.setItem('total_time', Math.floor(this.total_time).toString());
+            localStorage.setItem('last_score', this.last_score.toString());
+            localStorage.setItem('last_jump', this.last_jump.toString());
+            localStorage.setItem('last_time', this.last_time.toString());
+            localStorage.setItem('max_jump', this.max_jump.toString());
+            localStorage.setItem('max_time', this.max_time.toString());
+        } else if (mode === 2) {
+            // Сброс статистики
+            this.highest_score = 0;
+            this.total_play = 0;
+            this.total_score = 0;
+            this.total_time = 0;
+            this.last_score = 0;
+            this.last_jump = 0;
+            this.last_time = 0;
+            this.max_jump = 0;
+            this.max_time = 0;
+            this.set_statistics(1);
+        }
+    }
+    
+    play(sound) {
+        // Простая реализация звуков (можно добавить Web Audio API)
+        console.log("Play sound:", sound);
+    }
+    
+    onTouch(x, y) {
+        this.mmx = x;
+        this.mmy = y;
+        
+        if (this.settings) {
+            this.handleSettingsTouch(x, y);
+        } else if (this.statistics) {
+            this.handleStatisticsTouch(x, y);
+        } else if (!this.gamestart) {
+            this.handleMainMenuTouch(x, y);
+        } else if (this.gameover) {
+            this.another_init();
+        } else if (this.pause) {
+            this.handlePauseTouch(x, y);
+        } else if (x > this.width - 140 && x < this.width && y > 13 && y < 70) {
+            this.pause = true;
+        } else if (this.bullet_dt > 0.2) {
+            this.bullets.push(new Bullet(this.doodle.x + 48, this.doodle.y - 48, this.doodle, this));
+            this.bullet_dt = 0;
+            this.play("shoot.ogg");
+        }
+    }
+    
+    handleSettingsTouch(x, y) {
+        if (x > this.width / 2 - 50 && x < this.width / 2 + 60 && y > 650 && y < 716) {
+            this.settings = false;
+        }
+        if (x > this.width / 2 + 40 && x < this.width / 2 + 100 && y > 450 && y < 500) {
+            this.dir_shoot = false;
+        }
+        if (x > this.width / 2 - 100 && x < this.width / 2 - 45 && y > 450 && y < 500) {
+            this.dir_shoot = true;
+        }
+        if (x > this.width / 2 - 100 && x < this.width / 2 - 45 && y > 200 && y < 265) {
+            this.music_on = true;
+        }
+        if (x > this.width / 2 + 40 && x < this.width / 2 + 100 && y > 200 && y < 265) {
+            this.music_on = false;
+        }
+    }
+    
+    handleStatisticsTouch(x, y) {
+        if (x > this.width / 2 - 140 && x < this.width / 2 - 45 && y > 550 && y < 605) {
+            this.set_statistics(2);
+        }
+        if (x > this.width / 2 + 75 && x < this.width / 2 + 140 && y > 550 && y < 605) {
+            this.statistics = false;
+        }
+    }
+    
+    handleMainMenuTouch(x, y) {
+        if (x > this.width / 2 - 90 && x < this.width / 2 + 90 && y > 140 && y < 210) {
+            this.gamestart = true;
+        }
+        if (x > this.width / 2 - 120 && x < this.width / 2 + 120 && y > 290 && y < 360) {
+            this.settings = true;
+        }
+        if (x > this.width / 2 - 150 && x < this.width / 2 + 150 && y > 450 && y < 510) {
+            this.statistics = true;
+        }
+        if (x > this.width / 2 - 80 && x < this.width / 2 + 70 && y > 590 && y < 648) {
+            // Выход из игры
+            window.close();
+        }
+    }
+    
+    handlePauseTouch(x, y) {
+        if (x > this.width / 2 - 100 && x < this.width / 2 + 140 && y > 280 && y < 350) {
+            this.settings = true;
+        } else if (x > this.width / 2 - 70 && x < this.width / 2 + 70 && y < 510 && y > 440) {
+            this.pause = false;
+        }
+    }
 }
+
+// Статические константы
+Doodlejump.G = 900;
+Doodlejump.LEAST = 500;
